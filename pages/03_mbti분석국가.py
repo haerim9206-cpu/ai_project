@@ -4,59 +4,60 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # 페이지 설정
-st.set_page_config(page_title="Global MBTI Explorer", layout="wide")
+st.set_page_config(page_title="Global MBTI Ranking", layout="wide")
 
 @st.cache_data
 def load_data():
-    # 파일명이 업로드한 파일과 일치해야 해
+    # 파일 경로가 업로드한 파일명과 일치해야 함
     df = pd.read_csv('countriesMBTI_16types.csv')
     return df
 
 try:
     df = load_data()
 
-    st.title("🌍 국가별 MBTI 유형 분포 확인하기")
-    st.markdown("국가를 선택하면 해당 국가의 MBTI 비율을 확인할 수 있어. **1위 유형은 빨간색**으로 표시돼!")
+    st.title("📊 MBTI 유형별 국가 순위 확인하기")
+    st.markdown("특정 MBTI를 선택하면 어떤 나라에 그 유형이 가장 많은지 확인할 수 있어. **1위 국가는 빨간색**으로 표시돼!")
 
-    # 국가 선택 셀렉트박스
-    countries = df['Country'].unique()
-    selected_country = st.selectbox("분석할 국가를 선택해줘:", countries)
+    # MBTI 유형 선택 (Country 컬럼 제외한 나머지 컬럼들)
+    mbti_types = df.columns.drop('Country').tolist()
+    selected_mbti = st.selectbox("궁금한 MBTI 유형을 선택해줘:", mbti_types)
 
-    # 선택된 국가 데이터 추출 및 재구조화
-    country_data = df[df['Country'] == selected_country].drop(columns=['Country']).T
-    country_data.columns = ['Percentage']
-    country_data = country_data.sort_values(by='Percentage', ascending=False).reset_index()
-    country_data.columns = ['MBTI', 'Percentage']
+    # 데이터 정렬 및 상위 30개국 추출
+    mbti_ranking = df[['Country', selected_mbti]].sort_values(by=selected_mbti, ascending=False).head(30)
+    mbti_ranking.columns = ['Country', 'Percentage']
 
-    # 색상 설정: 1등은 빨간색, 나머지는 파란색 그라데이션 느낌
-    # Plotly의 Blues 스케일을 활용해서 1등 제외 나머지에 적용
-    colors = ['#EF553B'] + px.colors.sequential.Blues_r[1:len(country_data)]
-    # 만약 데이터 개수보다 색상 리스트가 부족하면 반복해서 채움
-    if len(colors) < len(country_data):
-        colors = colors + [px.colors.sequential.Blues_r[-1]] * (len(country_data) - len(colors))
+    # 색상 설정: 1등은 빨간색, 나머지는 파란색 그라데이션
+    # 데이터 개수에 맞춰 파란색 색상 리스트 생성
+    n_data = len(mbti_ranking)
+    blue_colors = px.colors.sample_colorscale("Blues", [i/(n_data) for i in range(n_data)], low=0.4, high=0.9)
+    blue_colors.reverse() # 높은 비율이 진한 파란색이 되도록 역순 정렬
+    
+    colors = ['#EF553B'] + blue_colors[1:]
 
-    # 차트 생성
+    # Plotly 막대 그래프 생성
     fig = go.Figure(go.Bar(
-        x=country_data['MBTI'],
-        y=country_data['Percentage'],
-        marker_color=colors[:len(country_data)],
+        x=mbti_ranking['Country'],
+        y=mbti_ranking['Percentage'],
+        marker_color=colors,
         hovertemplate='<b>%{x}</b><br>비율: %{y:.2%}<extra></extra>'
     ))
 
     fig.update_layout(
-        title=f"<b>{selected_country}</b>의 MBTI 유형별 비율",
-        xaxis_title="MBTI 유형",
+        title=f"<b>{selected_mbti}</b> 비율이 높은 상위 30개국",
+        xaxis_title="국가",
         yaxis_title="비율",
         yaxis_tickformat='.1%',
         template="plotly_white",
-        height=500
+        height=600,
+        xaxis={'categoryorder':'total descending'} # 비율 높은 순으로 정렬 유지
     )
 
     st.plotly_chart(fig, use_container_width=True)
 
-    # 상세 데이터 표
-    with st.expander("상세 데이터 보기"):
-        st.dataframe(country_data.style.format({'Percentage': '{:.2%}'}))
+    # 전체 순위 데이터 표
+    with st.expander(f"{selected_mbti} 전체 국가 순위 보기"):
+        full_ranking = df[['Country', selected_mbti]].sort_values(by=selected_mbti, ascending=False).reset_index(drop=True)
+        st.dataframe(full_ranking.style.format({selected_mbti: '{:.2%}'}))
 
 except FileNotFoundError:
-    st.error("데이터 파일을 찾을 수 없어. `countriesMBTI_16types.csv` 파일이 같은 경로에 있는지 확인해줘.")
+    st.error("`countriesMBTI_16types.csv` 파일을 찾을 수 없어. 깃허브 레포지토리에 파일을 꼭 같이 올려줘!")
