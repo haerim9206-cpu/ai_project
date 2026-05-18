@@ -1,6 +1,17 @@
+import subprocess
+import sys
+
+# 1. 외부 라이브러리 자동 설치 트리거 (requirements.txt 가 안 먹힐 때 방어 코드)
+try:
+    import folium
+    from streamlit_folium import st_folium
+except ModuleNotFoundError:
+    # 패키지가 없으면 pip install을 코드가 직접 실행함
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "folium", "streamlit-folium"])
+    import folium
+    from streamlit_folium import st_folium
+
 import streamlit as st
-import folium
-from streamlit_folium import st_folium
 
 st.set_page_config(page_title="서울 외국인 인기 관광지 Top 10", layout="wide")
 
@@ -32,14 +43,14 @@ for spot in spots:
     ).add_to(m)
 
 # st_folium 지도 렌더링
-map_data = st_folium(m, width=1000, height=500, key="seoul_tour_map_v3")
+map_data = st_folium(m, width=1000, height=500, key="seoul_tour_map_v4")
 
 st.markdown("---")
 st.subheader("🔍 선택한 관광지 상세 정보")
 
 selected_spot = None
 
-# 마커 클릭 이벤트 안전하게 수신
+# 마커 클릭 이벤트 수신
 if map_data and map_data.get("last_object_clicked"):
     click_info = map_data["last_object_clicked"]
     click_lat = click_info.get("lat")
