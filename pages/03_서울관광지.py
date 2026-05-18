@@ -2,7 +2,6 @@ import streamlit as st
 import folium
 from streamlit_folium import st_folium
 
-# 페이지 설정
 st.set_page_config(page_title="서울 외국인 인기 관광지 Top 10", layout="wide")
 
 st.title("🗺️ 외국인이 좋아하는 서울 관광지 Top 10")
@@ -22,10 +21,9 @@ spots = [
     {"name": "강남역 & 별마당도서관", "lat": 37.5119, "lng": 127.0589, "station": "2호선 삼성역 (코엑스몰 연결)", "fun": "거대한 오픈 도서관 포토존 인증샷 및 코엑스몰 쇼핑"}
 ]
 
-# 지도 생성 (서울 중심부)
+# 지도 생성
 m = folium.Map(location=[37.555, 126.992], zoom_start=12)
 
-# 마커 추가
 for spot in spots:
     folium.Marker(
         location=[spot["lat"], spot["lng"]],
@@ -33,30 +31,28 @@ for spot in spots:
         tooltip=spot["name"]
     ).add_to(m)
 
-# 지도를 화면에 그리되, 클릭된 오브젝트 정보만 가져오도록 최적화
-map_data = st_folium(m, width=1000, height=500, key="seoul_tour_map")
+# st_folium 지도 렌더링
+map_data = st_folium(m, width=1000, height=500, key="seoul_tour_map_v3")
 
 st.markdown("---")
 st.subheader("🔍 선택한 관광지 상세 정보")
 
 selected_spot = None
 
-# 클릭 데이터가 존재하고, last_object_clicked 데이터가 있을 때
+# 마커 클릭 이벤트 안전하게 수신
 if map_data and map_data.get("last_object_clicked"):
     click_info = map_data["last_object_clicked"]
     click_lat = click_info.get("lat")
     click_lng = click_info.get("lng")
     
-    # 위도, 경도 좌표 비교로 선택한 관광지 매칭 (소수점 3자리까지 비교해서 오차 방지)
     if click_lat and click_lng:
         for spot in spots:
             if abs(spot["lat"] - click_lat) < 0.005 and abs(spot["lng"] - click_lng) < 0.005:
                 selected_spot = spot
                 break
 
-# 하단 출력 부분
 if selected_spot:
     st.success(f"📍 **{selected_spot['name']}**")
     st.info(f"🚇 **가까운 지하철역:** {selected_spot['station']} | 🎡 **추천 놀거리:** {selected_spot['fun']}")
 else:
-    st.write("지도 위의 마커를 클릭하면 상세 정보가 여기에 표시돼.")
+    st.write("지도의 마커를 클릭하면 상세 정보가 한 줄 요약되어 여기에 표시돼.")
