@@ -1,24 +1,14 @@
-import subprocess
-import sys
-
-# 1. 외부 라이브러리 자동 설치 트리거 (requirements.txt 가 안 먹힐 때 방어 코드)
-try:
-    import folium
-    from streamlit_folium import st_folium
-except ModuleNotFoundError:
-    # 패키지가 없으면 pip install을 코드가 직접 실행함
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "folium", "streamlit-folium"])
-    import folium
-    from streamlit_folium import st_folium
-
 import streamlit as st
+import folium
+from streamlit_folium import st_folium
 
+# 페이지 설정
 st.set_page_config(page_title="서울 외국인 인기 관광지 Top 10", layout="wide")
 
 st.title("🗺️ 외국인이 좋아하는 서울 관광지 Top 10")
 st.markdown("지도의 마커를 클릭하면 하단에서 **가까운 지하철역**과 **추천 놀거리**를 볼 수 있어!")
 
-# 관광지 데이터
+# 관광지 데이터 (위도, 경도, 지하철역, 놀거리 요약)
 spots = [
     {"name": "경복궁", "lat": 37.5796, "lng": 126.9770, "station": "3호선 경복궁역", "fun": "한복 대여 체험 및 광화문 광장 산책"},
     {"name": "N서울타워 (남산)", "lat": 37.5512, "lng": 126.9882, "station": "4호선 명동역 (케이블카 이용)", "fun": "서울 시내 전망 감상 및 사랑의 자물쇠 걸기"},
@@ -32,9 +22,10 @@ spots = [
     {"name": "강남역 & 별마당도서관", "lat": 37.5119, "lng": 127.0589, "station": "2호선 삼성역 (코엑스몰 연결)", "fun": "거대한 오픈 도서관 포토존 인증샷 및 코엑스몰 쇼핑"}
 ]
 
-# 지도 생성
+# 지도 생성 (서울 중심부)
 m = folium.Map(location=[37.555, 126.992], zoom_start=12)
 
+# 마커 추가
 for spot in spots:
     folium.Marker(
         location=[spot["lat"], spot["lng"]],
@@ -42,28 +33,30 @@ for spot in spots:
         tooltip=spot["name"]
     ).add_to(m)
 
-# st_folium 지도 렌더링
-map_data = st_folium(m, width=1000, height=500, key="seoul_tour_map_v4")
+# 스트림릿에 지도 렌더링 및 클릭 이벤트 감지
+# returned_objects를 통해 클릭한 마커 정보를 가져옴
+map_data = st_folium(m, width=1000, height=500, returned_objects=["last_object_clicked"])
 
 st.markdown("---")
 st.subheader("🔍 선택한 관광지 상세 정보")
 
-selected_spot = None
-
-# 마커 클릭 이벤트 수신
+# 마커 클릭 여부 확인 후 정보 표시
 if map_data and map_data.get("last_object_clicked"):
-    click_info = map_data["last_object_clicked"]
-    click_lat = click_info.get("lat")
-    click_lng = click_info.get("lng")
+    click_lat = map_data["last_object_clicked"]["lat"]
+    click_lng = map_data["last_object_clicked"]["lng"]
     
-    if click_lat and click_lng:
-        for spot in spots:
-            if abs(spot["lat"] - click_lat) < 0.005 and abs(spot["lng"] - click_lng) < 0.005:
-                selected_spot = spot
-                break
-
-if selected_spot:
-    st.success(f"📍 **{selected_spot['name']}**")
-    st.info(f"🚇 **가까운 지하철역:** {selected_spot['station']} | 🎡 **추천 놀거리:** {selected_spot['fun']}")
+    # 클릭한 좌표와 일치하는 관광지 찾기 (소수점 4자리까지 비교)
+    selected_spot = None
+    for spot in spots:
+        if abs(spot["lat"] - click_lat) < 0.001 and abs(spot["lng"] - click_lng) < 0.001:
+            selected_spot = spot
+            break
+            
+    if selected_spot:
+        st.success(f"📍 **{selected_spot['name']}**")
+        # 한 줄 요약 출력
+        st.info(f"🚇 **가까운 지하철역:** {selected_spot['station']} | 🎡 **추천 놀거리:** {selected_spot['fun']}")
+    else:
+        st.warning("관광지 마커를 정확하게 클릭해줘!")
 else:
-    st.write("지도의 마커를 클릭하면 상세 정보가 한 줄 요약되어 여기에 표시돼.")
+    st.write("지도 위의 마커를 클릭하면 상세 정보가 여기에 표시돼.")
