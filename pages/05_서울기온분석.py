@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as object_patch # 에러 방지용 가칭, 실제 코드는 plotly.graph_objects 사용
 import plotly.graph_objects as go
 
 # 0. 페이지 설정
@@ -100,4 +99,10 @@ try:
             min_row = filtered_df.loc[filtered_df['최저기온(℃)'].idxmin()]
             st.metric(label=f"역대 가장 추웠던 {selected_month}/{selected_day}", value=f"{min_row['최저기온(℃)']} ℃", delta=f"{int(min_row['연도'])}년", delta_color="inverse")
         with col3:
-            st.metric(label="총 데이터 연도 수", value=f
+            st.metric(label="총 데이터 연도 수", value=f"{len(filtered_df)}개 연도")
+
+    else:
+        st.warning("선택한 날짜에 해당하는 데이터가 존재하지 않습니다.")
+
+except FileNotFoundError:
+    st.error("❌ `seoul.csv` 파일을 찾을 수 없습니다. 파이썬 스크립트(`app.py`)와 같은 폴더에 파일을 넣어주세요.")
