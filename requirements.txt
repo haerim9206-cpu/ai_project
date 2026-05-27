@@ -5,3 +5,4 @@ streamlit>=1.30.0
 folium>=0.15.0
 streamlit-folium>=0.18.0
 matplotlib
+pip install -r requirements.txtstreamlit run app.py
