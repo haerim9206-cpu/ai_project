@@ -1,32 +1,39 @@
 import streamlit as st
 import pandas as pd
+import os
 
 # 페이지 설정
 st.set_page_config(page_title="인천 식당 평점 검색 시스템", layout="wide")
 
-# 데이터 로드 함수
+# 데이터 로드 함수 (상위 폴더의 csv 파일을 읽도록 경로 수정)
 @st.cache_data
 def load_data():
-    try:
-        # utf-8로 읽고 에러는 무시하도록 처리
-        df = pd.read_csv('food.csv', encoding='utf-8', errors='ignore')
+    # 현재 실행 기준 또는 상위 폴더 경로 모두 대응할 수 있도록 설정
+    possible_paths = ['../food.csv', 'food.csv']
+    df = None
+    
+    for path in possible_paths:
+        if os.path.exists(path):
+            try:
+                df = pd.read_csv(path, encoding='utf-8', errors='ignore')
+                break
+            except Exception:
+                continue
+                
+    if df is not None:
         # 컬럼명 좌우 공백 제거
         df.columns = df.columns.str.strip()
         # 지역명 데이터가 있다면 공백 제거 및 문자열 변환
         if '지역명' in df.columns:
             df['지역명'] = df['지역명'].astype(str).str.strip()
         return df
-    except FileNotFoundError:
-        return None
-    except Exception as e:
-        st.error(f"데이터를 읽는 중 오류가 발생했습니다: {e}")
-        return None
+    return None
 
 # 데이터 불러오기
 df = load_data()
 
 if df is None:
-    st.error("📂 'food.csv' 파일을 찾을 수 없거나 불러오지 못했어. GitHub 저장소에 app.py와 같은 위치에 업로드했는지 꼭 확인해줘!")
+    st.error("📂 'food.csv' 파일을 찾을 수 없거나 불러오지 못했어. 상위 폴더에 food.csv 파일이 있는지 꼭 확인해줘!")
 else:
     st.title("🍽️ 인천 지역별 식당 평점 검색 대시보드")
     st.markdown("---")
