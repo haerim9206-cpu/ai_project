@@ -4,3 +4,5 @@ plotly
 folium>=0.15.0
 streamlit-folium>=0.18.0
 matplotlib
+streamlit>=1.30.0
+pandas>=2.0.0
