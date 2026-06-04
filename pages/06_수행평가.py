@@ -5,20 +5,27 @@ import streamlit as st
 
 @st.cache_data
 def load_data():
-    # 현재 파일(06_수행평가.py)의 절대 경로를 가져옴
+    # 현재 파일(06_수행평가.py)의 절대 경로 기준 설정
     current_dir = os.path.dirname(os.path.abspath(__file__))
-
-    # pages 폴더의 상위 폴더(루트)에 있는 food.csv 경로를 계산
     csv_path = os.path.join(current_dir, "..", "food.csv")
 
-    # 계산된 경로로 데이터 읽기
-    df = pd.read_csv(csv_path)
+    # 인코딩 오류 해결을 위한 에러 핸들링 구조
+    try:
+        # 1. 먼저 한글 깨짐이 가장 자주 발생하는 cp949 인코딩으로 시도
+        df = pd.read_csv(csv_path, encoding="cp949")
+    except UnicodeDecodeError:
+        try:
+            # 2. 실패 시 utf-8 인코딩으로 시도
+            df = pd.read_csv(csv_path, encoding="utf-8")
+        except UnicodeDecodeError:
+            # 3. 그것도 실패 시 BOM이 포함된 utf-8-sig로 최종 시도
+            df = pd.read_csv(csv_path, encoding="utf-8-sig")
 
     # 컬럼명 공백 제거 및 평점 숫자형 변환
     df.columns = df.columns.str.strip()
     df["네이버평점"] = pd.to_numeric(df["네이버평점"], errors="coerce")
 
-    # 지점명과 식당명의 결측치를 빈 문자열로 대체
+    # 지점명과 식당명의 결측치를 빈 문자열로 대체 (텍스트 검색용)
     df["지점명"] = df["지점명"].fillna("").astype(str)
     df["식당명"] = df["식당명"].fillna("").astype(str)
 
@@ -30,17 +37,16 @@ df = load_data()
 st.title("🍴 지역별 식당 평점 분석 대시보드")
 st.markdown("---")
 
-# 2. 지역 선택 (사용자가 검색하거나 선택할 수 있는 주요 지역 키워드 정의)
-# 데이터 특징에 맞게 조회하고 싶은 키워드를 배열에 추가하면 돼.
+# 2. 지역 선택 (데이터 특징에 맞게 조회하고 싶은 주요 지역 키워드 구성)
 region_keywords = [
     "전체",
     "송도",
     "월미도",
-    "인천",
-    "인천시청",
     "부평",
     "구월",
     "주안",
+    "고잔",
+    "남촌",
 ]
 selected_region = st.selectbox("분석할 지역(키워드)을 선택해줘:", region_keywords)
 
@@ -80,7 +86,6 @@ st.subheader(f"⭐ {selected_region} 지역 평점 높은 식당 TOP 5")
 
 if not rated_df.empty:
     # 평점 기준 내림차순 정렬 후 상위 5개 추출
-    # 만약 중복된 식당이 많다면 식당명+지점명 기준으로 그룹화하여 평균을 낼 수도 있음
     top5 = (
         rated_df.sort_values(by="네이버평점", ascending=False)
         .head(5)[["식당명", "지점명", "네이버평점"]]
@@ -95,6 +100,6 @@ if not rated_df.empty:
 else:
     st.warning("이 지역에는 평점 데이터가 등록된 식당이 없어!")
 
-# (옵션) 필터링된 전체 데이터 확인용 라이트박스
+# 필터링된 전체 데이터 확인용 확장 탭
 with st.expander("선택한 지역의 전체 데이터 보기"):
     st.dataframe(filtered_df)
