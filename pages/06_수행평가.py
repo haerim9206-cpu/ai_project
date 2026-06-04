@@ -1,18 +1,24 @@
+import os
 import pandas as pd
 import streamlit as st
 
 
-# 1. 데이터 불러오기 함수 (캐싱 적용)
 @st.cache_data
 def load_data():
-    # csv 파일이 상위 폴더(..)에 있으므로 경로를 ../food.csv 로 설정
-    df = pd.read_csv("../food.csv")
+    # 현재 파일(06_수행평가.py)의 절대 경로를 가져옴
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # pages 폴더의 상위 폴더(루트)에 있는 food.csv 경로를 계산
+    csv_path = os.path.join(current_dir, "..", "food.csv")
+
+    # 계산된 경로로 데이터 읽기
+    df = pd.read_csv(csv_path)
 
     # 컬럼명 공백 제거 및 평점 숫자형 변환
     df.columns = df.columns.str.strip()
     df["네이버평점"] = pd.to_numeric(df["네이버평점"], errors="coerce")
 
-    # 지점명과 식당명의 결측치를 빈 문자열로 대체 (텍스트 검색용)
+    # 지점명과 식당명의 결측치를 빈 문자열로 대체
     df["지점명"] = df["지점명"].fillna("").astype(str)
     df["식당명"] = df["식당명"].fillna("").astype(str)
 
