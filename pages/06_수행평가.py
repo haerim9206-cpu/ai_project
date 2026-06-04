@@ -1,107 +1,94 @@
-import streamlit as st
 import pandas as pd
-import os
+import streamlit as st
 
-# 페이지 설정
-st.set_page_config(page_title="인천 식당 평점 검색 시스템", layout="wide")
 
-# 데이터 로드 함수 (상위 폴더의 csv 파일을 읽도록 경로 수정)
+# 1. 데이터 불러오기 함수 (캐싱 적용)
 @st.cache_data
 def load_data():
-    # 현재 실행 기준 또는 상위 폴더 경로 모두 대응할 수 있도록 설정
-    possible_paths = ['../food.csv', 'food.csv']
-    df = None
-    
-    for path in possible_paths:
-        if os.path.exists(path):
-            try:
-                df = pd.read_csv(path, encoding='utf-8', errors='ignore')
-                break
-            except Exception:
-                continue
-                
-    if df is not None:
-        # 컬럼명 좌우 공백 제거
-        df.columns = df.columns.str.strip()
-        # 지역명 데이터가 있다면 공백 제거 및 문자열 변환
-        if '지역명' in df.columns:
-            df['지역명'] = df['지역명'].astype(str).str.strip()
-        return df
-    return None
+    # csv 파일이 상위 폴더(..)에 있으므로 경로를 ../food.csv 로 설정
+    df = pd.read_csv("../food.csv")
 
-# 데이터 불러오기
+    # 컬럼명 공백 제거 및 평점 숫자형 변환
+    df.columns = df.columns.str.strip()
+    df["네이버평점"] = pd.to_numeric(df["네이버평점"], errors="coerce")
+
+    # 지점명과 식당명의 결측치를 빈 문자열로 대체 (텍스트 검색용)
+    df["지점명"] = df["지점명"].fillna("").astype(str)
+    df["식당명"] = df["식당명"].fillna("").astype(str)
+
+    return df
+
+
 df = load_data()
 
-if df is None:
-    st.error("📂 'food.csv' 파일을 찾을 수 없거나 불러오지 못했어. 상위 폴더에 food.csv 파일이 있는지 꼭 확인해줘!")
+st.title("🍴 지역별 식당 평점 분석 대시보드")
+st.markdown("---")
+
+# 2. 지역 선택 (사용자가 검색하거나 선택할 수 있는 주요 지역 키워드 정의)
+# 데이터 특징에 맞게 조회하고 싶은 키워드를 배열에 추가하면 돼.
+region_keywords = [
+    "전체",
+    "송도",
+    "월미도",
+    "인천",
+    "인천시청",
+    "부평",
+    "구월",
+    "주안",
+]
+selected_region = st.selectbox("분석할 지역(키워드)을 선택해줘:", region_keywords)
+
+# 3. 선택한 지역에 맞게 데이터 필터링
+if selected_region == "전체":
+    filtered_df = df.copy()
 else:
-    st.title("🍽️ 인천 지역별 식당 평점 검색 대시보드")
-    st.markdown("---")
-    
-    # 1. 텍스트 입력으로 지역 검색 기능 구현
-    st.subheader("🔍 지역명 검색")
-    search_query = st.text_input(
-        "검색하고 싶은 지역명을 입력해줘 (예: 연수구, 서구, 강화군, 남동구)", 
-        value=""
-    ).strip()
-    
-    st.markdown("---")
-    
-    if search_query:
-        # 입력한 검색어가 포함된 지역 필터링
-        matched_regions = df[df['지역명'].str.contains(search_query, case=False, na=False)]['지역명'].unique()
-        
-        if len(matched_regions) == 0:
-            st.error(f"❌ '{search_query}'와(과) 일치하는 지역명을 찾을 수 없어. 다시 입력해줘!")
-        else:
-            # 매칭된 첫 번째 지역을 기준으로 분석 진행
-            selected_region = matched_regions[0]
-            
-            if len(matched_regions) > 1:
-                st.info(f"💡 여러 지역이 검색되었어. 가장 유사한 **{selected_region}** 기준으로 결과를 보여줄게! (검색된 다른 지역: {', '.join(matched_regions[1:])})")
-            
-            # 선택된 지역 데이터 필터링
-            region_df = df[df['지역명'] == selected_region]
-            
-            # '네이버평점' 컬럼 숫자로 변환 (에러 방지)
-            region_df['네이버평점'] = pd.to_numeric(region_df['네이버평점'], errors='coerce')
-            rated_region_df = region_df.dropna(subset=['네이버평점'])
-            
-            # 2. 식당 수와 평균 평점 출력
-            st.header(f"📊 {selected_region} 분석 결과")
-            
-            total_restaurants = len(region_df)
-            rated_restaurants = len(rated_region_df)
-            avg_rating = rated_region_df['네이버평점'].mean() if rated_restaurants > 0 else 0
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric(label="전체 식당 수", value=f"{total_restaurants:,} 개")
-            with col2:
-                st.metric(label="평균 네이버 평점", value=f"{avg_rating:.2f} / 5.0")
-                
-            st.markdown("---")
-            
-            # 3. 검색한 지역 중에서 가장 평균 평점이 높은 식당 TOP 5
-            st.header(f"🏆 {selected_region} 평점 높은 식당 TOP 5")
-            
-            if rated_restaurants > 0:
-                # 평점 기준 내림차순 정렬 후 상위 5개 추출
-                top5 = rated_region_df.sort_values(by='네이버평점', ascending=False).head(5)
-                
-                # 지점명 결측치 처리
-                if '지점명' in top5.columns:
-                    top5['지점명'] = top5['지점명'].fillna('-')
-                else:
-                    top5['지점명'] = '-'
-                    
-                # 인덱스를 1부터 시작하도록 재설정
-                top5_display = top5[['식당명', '지점명', '네이버평점']].reset_index(drop=True)
-                top5_display.index = top5_display.index + 1
-                
-                # 결과 테이블 출력
-                st.table(top5_display)
-            else:
-                st.warning("선택한 지역에 평점이 등록된 식당이 없습니다.")
+    # 식당명이나 지점명에 해당 지역 키워드가 포함된 데이터만 필터링
+    filtered_df = df[
+        df["식당명"].str.contains(selected_region)
+        | df["지점명"].str.contains(selected_region)
+    ]
+
+# 평점이 존재하는 데이터만 따로 분리 (통계 및 TOP 5 계산용)
+rated_df = filtered_df.dropna(subset=["네이버평점"])
+
+# --- 요구사항 2: 식당 수와 평균 평점 표시 ---
+st.subheader(f"📍 {selected_region} 지역 요약 정보")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    total_count = len(filtered_df)
+    st.metric(label="총 식당 수 (구내식당 포함)", value=f"{total_count:,}개")
+
+with col2:
+    if not rated_df.empty:
+        avg_rating = rated_df["네이버평점"].mean()
+        st.metric(label="평균 네이버 평점", value=f"{avg_rating:.2f} / 5.0")
     else:
-        st.info("💡 위의 입력창에 검색하고 싶은 지역명(예: 연수구)을 입력하면 상세 분석 결과가 나타나!")
+        st.metric(label="평균 네이버 평점", value="데이터 없음")
+
+st.markdown("---")
+
+# --- 요구사항 3: 평균 평점이 높은 식당 Top 5 ---
+st.subheader(f"⭐ {selected_region} 지역 평점 높은 식당 TOP 5")
+
+if not rated_df.empty:
+    # 평점 기준 내림차순 정렬 후 상위 5개 추출
+    # 만약 중복된 식당이 많다면 식당명+지점명 기준으로 그룹화하여 평균을 낼 수도 있음
+    top5 = (
+        rated_df.sort_values(by="네이버평점", ascending=False)
+        .head(5)[["식당명", "지점명", "네이버평점"]]
+        .reset_index(drop=True)
+    )
+
+    # 인덱스를 1부터 시작하도록 변경
+    top5.index = top5.index + 1
+
+    # 테이블 형태로 깔끔하게 출력
+    st.table(top5)
+else:
+    st.warning("이 지역에는 평점 데이터가 등록된 식당이 없어!")
+
+# (옵션) 필터링된 전체 데이터 확인용 라이트박스
+with st.expander("선택한 지역의 전체 데이터 보기"):
+    st.dataframe(filtered_df)
